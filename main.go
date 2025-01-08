@@ -4,6 +4,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
+)
+
+var (
+	ready     bool       // Global variable to track readiness
+	readyLock sync.Mutex // Mutex to synchronize access to readiness state
 )
 
 func main() {
@@ -12,6 +18,29 @@ func main() {
 		// Respond with a simple health check message
 		w.WriteHeader(http.StatusOK) // HTTP 200 OK
 		fmt.Fprintf(w, "Server is healthy!")
+	})
+
+	// Readiness probe endpoint
+	http.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+		readyLock.Lock()
+		defer readyLock.Unlock()
+
+		if ready {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, "Server is ready!")
+		} else {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprintf(w, "Server is not ready yet.")
+		}
+	})
+
+	// Endpoint to toggle readiness (for simulation/testing purposes)
+	http.HandleFunc("/toggle-ready", func(w http.ResponseWriter, r *http.Request) {
+		readyLock.Lock()
+		defer readyLock.Unlock()
+
+		ready = !ready // Toggle readiness state
+		fmt.Fprintf(w, "Readiness state toggled. Now ready: %v", ready)
 	})
 
 	// Starting the server on port 8080
