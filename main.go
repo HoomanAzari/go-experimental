@@ -7,12 +7,31 @@ import (
 	"sync"
 )
 
-var (
-	ready     bool       // Global variable to track readiness
-	readyLock sync.Mutex // Mutex to synchronize access to readiness state
-)
+type ReadinessState struct {
+	ready     bool       // Tracks readiness state
+	readyLock sync.Mutex // Ensures thread-safe access to `ready`
+}
+
+// SetState safely updates the readiness state
+// Pointer receiver is used because we modify the struct
+func (s *ReadinessState) SetState(value bool) {
+	s.readyLock.Lock()
+	defer s.readyLock.Unlock()
+	s.ready = value
+}
+
+// IsReady safely retrieves the readiness state
+// Pointer receiver is used because we modify the struct
+func (s *ReadinessState) isReady() bool {
+	s.readyLock.Lock()         // Lock to safely access 'ready'
+	defer s.readyLock.Unlock() // Unlock after checking 'ready'
+	return s.ready
+}
 
 func main() {
+	// Create a new ReadinessState instance and return a pointer to it
+	state := &ReadinessState{}
+
 	// Health check handler
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		// Respond with a simple health check message
@@ -22,25 +41,20 @@ func main() {
 
 	// Readiness probe endpoint
 	http.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
-		readyLock.Lock()
-		defer readyLock.Unlock()
-
-		if ready {
+		if state.isReady() {
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, "Server is ready!")
+			fmt.Fprintf(w, "Service is ready!")
 		} else {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			fmt.Fprintf(w, "Server is not ready yet.")
+			fmt.Fprintf(w, "Service is not ready yet.")
 		}
 	})
 
 	// Endpoint to toggle readiness (for simulation/testing purposes)
 	http.HandleFunc("/toggle-ready", func(w http.ResponseWriter, r *http.Request) {
-		readyLock.Lock()
-		defer readyLock.Unlock()
-
-		ready = !ready // Toggle readiness state
-		fmt.Fprintf(w, "Readiness state toggled. Now ready: %v", ready)
+		currentState := state.isReady()
+		state.SetState(!currentState)
+		fmt.Fprintf(w, "Readiness state toggled. Now ready: %v", !currentState)
 	})
 
 	// Starting the server on port 8080
