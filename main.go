@@ -28,7 +28,7 @@ func (rm *ReadinessManager) SetState(component string, value bool) {
 
 // IsReady safely retrieves the readiness state
 // Pointer receiver is used because we modify the struct
-func (rm *ReadinessManager) isReady(component string) (bool, bool) {
+func (rm *ReadinessManager) IsReady(component string) (bool, bool) {
 	rm.lock.RLock()
 	defer rm.lock.RUnlock()
 	state, exists := rm.states[component]
@@ -67,7 +67,7 @@ func main() {
 			return
 		}
 
-		state, exists := manager.isReady(component)
+		state, exists := manager.IsReady(component)
 		if !exists {
 			http.Error(w, fmt.Sprintf("Component '%s' not found", component), http.StatusNotFound)
 			return
